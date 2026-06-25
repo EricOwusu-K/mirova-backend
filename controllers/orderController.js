@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler')
 const Order = require('../models/Order')
 const User = require('../models/User')
+const Notification = require('../models/Notification')
 
 // @desc    Create new order
 // @route   POST /api/orders
@@ -18,6 +19,15 @@ const createOrder = asyncHandler(async (req, res) => {
     shippingAddress,
     paymentMethod,
     totalPrice,
+  })
+
+  // Create notification for order placed
+  await Notification.create({
+    user: req.user._id,
+    title: 'Order placed successfully',
+    message: `Your order #${order._id.toString().slice(-8).toUpperCase()} has been received and is being processed.`,
+    type: 'order_update',
+    orderId: order._id,
   })
 
   // Clear the user's cart after order is placed
@@ -45,7 +55,6 @@ const getOrderById = asyncHandler(async (req, res) => {
     throw new Error('Order not found')
   }
 
-  // Make sure the order belongs to the logged in user or admin
   if (order.user._id.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
     res.status(401)
     throw new Error('Not authorized to view this order')
@@ -79,6 +88,16 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   }
 
   const updatedOrder = await order.save()
+
+  // Create notification for the customer
+  await Notification.create({
+    user: order.user,
+    title: 'Order status updated',
+    message: `Your order #${order._id.toString().slice(-8).toUpperCase()} has been updated to ${status}.`,
+    type: 'order_update',
+    orderId: order._id,
+  })
+
   res.json(updatedOrder)
 })
 

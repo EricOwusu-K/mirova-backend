@@ -6,6 +6,7 @@ const productRoutes = require('./routes/productRoutes')
 const cartRoutes = require('./routes/cartRoutes')
 const orderRoutes = require('./routes/orderRoutes')
 const uploadRoutes = require('./routes/uploadRoutes')
+const notificationRoutes = require('./routes/notificationRoutes')
 const connectDB = require('./config/db');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
@@ -14,7 +15,6 @@ connectDB();
 
 const app = express();
 
-// Middleware
 app.use(cors({
   origin: ['https://mirova-jewellery.vercel.app', 'http://localhost:5173'],
   credentials: true
@@ -23,18 +23,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/api/upload', uploadRoutes)
 
-// Test route
 app.get('/', (req, res) => {
   res.json({ message: 'Jewellery API is running...' });
 });
 
-// Routes
 app.use('/api/auth', authRoutes)
 app.use('/api/products', productRoutes)
 app.use('/api/cart', cartRoutes)
 app.use('/api/orders', orderRoutes)
+app.use('/api/notifications', notificationRoutes)
 
-// Error Middleware
 app.use(notFound);
 app.use(errorHandler);
 

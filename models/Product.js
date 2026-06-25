@@ -16,9 +16,9 @@ const productSchema = new mongoose.Schema(
     description: { type: String, required: true },
     price: { type: Number, required: true },
     category: {
-      type: String,
-      enum: ['Earrings', 'Necklaces', 'Bracelets', 'Rings', 'Sunglasses'],
-      required: true,
+    type: String,
+    enum: ['Earrings', 'Necklaces', 'Bracelets', 'Rings', 'Sunglasses', 'Watches'],
+    required: true,
     },
     material: { type: String, default: '' },
     images: [{ type: String }],

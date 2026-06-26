@@ -7,6 +7,7 @@ const cartRoutes = require('./routes/cartRoutes')
 const orderRoutes = require('./routes/orderRoutes')
 const uploadRoutes = require('./routes/uploadRoutes')
 const notificationRoutes = require('./routes/notificationRoutes')
+const messageRoutes = require('./routes/messageRoutes')
 const connectDB = require('./config/db');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 const helpRoutes = require('./routes/helpRoutes')
@@ -34,6 +35,7 @@ app.use('/api/cart', cartRoutes)
 app.use('/api/orders', orderRoutes)
 app.use('/api/notifications', notificationRoutes)
 app.use('/api/help', helpRoutes)
+app.use('/api/messages', messageRoutes)
 
 app.use(notFound);
 app.use(errorHandler);

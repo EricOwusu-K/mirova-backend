@@ -9,6 +9,7 @@ const uploadRoutes = require('./routes/uploadRoutes')
 const notificationRoutes = require('./routes/notificationRoutes')
 const connectDB = require('./config/db');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
+const helpRoutes = require('./routes/helpRoutes')
 
 dotenv.config();
 connectDB();
@@ -32,6 +33,7 @@ app.use('/api/products', productRoutes)
 app.use('/api/cart', cartRoutes)
 app.use('/api/orders', orderRoutes)
 app.use('/api/notifications', notificationRoutes)
+app.use('/api/help', helpRoutes)
 
 app.use(notFound);
 app.use(errorHandler);

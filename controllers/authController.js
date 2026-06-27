@@ -72,9 +72,43 @@ const getUserProfile = asyncHandler(async (req, res) => {
   }
 })
 
+// @desc    Update logged in user profile
+// @route   PUT /api/auth/profile
+const updateUserProfile = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id)
+
+  if (!user) {
+    res.status(404)
+    throw new Error('User not found')
+  }
+
+  user.name = req.body.name || user.name
+  user.email = req.body.email || user.email
+  user.phone = req.body.phone || user.phone
+
+  if (req.body.password) {
+    if (req.body.password.length < 6) {
+      res.status(400)
+      throw new Error('Password must be at least 6 characters')
+    }
+    user.password = req.body.password
+  }
+
+  const updatedUser = await user.save()
+
+  res.json({
+    _id: updatedUser._id,
+    name: updatedUser.name,
+    email: updatedUser.email,
+    phone: updatedUser.phone,
+    role: updatedUser.role,
+    token: generateToken(updatedUser._id),
+  })
+})
+
 const getAllUsers = asyncHandler(async (req, res) => {
   const users = await User.find().select('-password').sort({ createdAt: -1 })
   res.json(users)
 })
 
-module.exports = { registerUser, loginUser, getUserProfile, getAllUsers }
+module.exports = { registerUser, loginUser, getUserProfile, updateUserProfile, getAllUsers }

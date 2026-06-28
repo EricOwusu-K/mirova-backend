@@ -7,7 +7,15 @@ router.post('/', protect, adminOnly, upload.single('image'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'No image uploaded' })
   }
-  res.json({ imageUrl: req.file.path })
+
+  // multer-storage-cloudinary may return URL in different fields
+  const imageUrl = req.file.path || req.file.secure_url || req.file.url
+
+  if (!imageUrl) {
+    return res.status(500).json({ message: 'Image uploaded but URL not found' })
+  }
+
+  res.json({ imageUrl })
 })
 
 module.exports = router

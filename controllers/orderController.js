@@ -6,7 +6,7 @@ const Notification = require('../models/Notification')
 // @desc    Create new order
 // @route   POST /api/orders
 const createOrder = asyncHandler(async (req, res) => {
-  const { orderItems, shippingAddress, paymentMethod, totalPrice } = req.body
+  const { orderItems, shippingAddress, paymentMethod, totalPrice, paymentReference, isPaid } = req.body
 
   if (!orderItems || orderItems.length === 0) {
     res.status(400)
@@ -19,9 +19,11 @@ const createOrder = asyncHandler(async (req, res) => {
     shippingAddress,
     paymentMethod,
     totalPrice,
+    isPaid: isPaid || false,
+    paidAt: isPaid ? Date.now() : null,
+    paymentReference: paymentReference || null,
   })
 
-  // Create notification for order placed
   await Notification.create({
     user: req.user._id,
     title: 'Order placed successfully',
@@ -30,7 +32,6 @@ const createOrder = asyncHandler(async (req, res) => {
     orderId: order._id,
   })
 
-  // Clear the user's cart after order is placed
   const user = await User.findById(req.user._id)
   user.cart = []
   await user.save()

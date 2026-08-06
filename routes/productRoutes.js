@@ -9,9 +9,11 @@ const {
   updateProduct,
   deleteProduct,
   logInteraction,
+  getRecommendations,
 } = require('../controllers/productController')
 const { protect, adminOnly } = require('../middleware/authMiddleware')
 
+router.get('/recommended', protect, getRecommendations)
 router.get('/featured', getFeaturedProducts)
 router.get('/new-arrivals', getNewArrivals)
 router.get('/', getProducts)

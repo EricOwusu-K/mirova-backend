@@ -1,7 +1,6 @@
 const asyncHandler = require('express-async-handler')
 const Product = require('../models/Product')
 const Interaction = require('../models/Interaction')
-const Interaction = require('../models/Interaction')
 
 // @desc    Get personalised recommendations for logged in user
 // @route   GET /api/products/recommended

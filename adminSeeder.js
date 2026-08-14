@@ -16,6 +16,7 @@ const createAdmin = async () => {
       admin.email = 'mirova.jewelleryy@gmail.com'
       admin.password = 'Swift.mirova79'
       admin.phone = '055 906 4813'
+      admin.isVerified = true
       await admin.save()
       console.log('✅ Admin credentials successfully updated!')
       console.log('Email: mirova.jewelleryy@gmail.com')
@@ -27,6 +28,7 @@ const createAdmin = async () => {
         password: 'Swift.mirova79',
         phone: '055 906 4813',
         role: 'admin',
+        isVerified: true,
       })
       console.log('✅ Admin account successfully created!')
       console.log('Email: mirova.jewelleryy@gmail.com')

@@ -17,6 +17,11 @@ const userSchema = new mongoose.Schema(
     profileImage: { type: String, default: '' },
     wishlist: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
     cart: [cartItemSchema],
+
+    // ── OTP email verification fields ──
+    isVerified: { type: Boolean, default: false },
+    otp: { type: String },
+    otpExpiry: { type: Date },
   },
   { timestamps: true }
 )

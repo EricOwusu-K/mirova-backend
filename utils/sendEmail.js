@@ -3,14 +3,11 @@ const nodemailer = require('nodemailer')
 const sendOtpEmail = async (to, otp, name = '') => {
   const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 587,              // use 587 (TLS) instead of 465 (SSL)
-    secure: false,          // false for port 587
+    port: 465,
+    secure: true,               // true for port 465
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
-    },
-    tls: {
-      rejectUnauthorized: false,
     },
   })
 

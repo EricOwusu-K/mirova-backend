@@ -1,27 +1,10 @@
-const nodemailer = require('nodemailer')
+const { Resend } = require('resend')
+
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 const sendOtpEmail = async (to, otp, name = '') => {
-  const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-    connectionTimeout: 10000,   // 10 seconds
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
-    tls: {
-      rejectUnauthorized: false,
-    },
-  })
-
-  // Verify connection before sending (helps surface the real error)
-  await transporter.verify()
-
-  const mailOptions = {
-    from: `"Mirova Jewellery" <${process.env.EMAIL_USER}>`,
+  const { error } = await resend.emails.send({
+    from: 'Mirova Jewellery <onboarding@resend.dev>',
     to,
     subject: 'Your Mirova Verification Code',
     html: `
@@ -38,9 +21,11 @@ const sendOtpEmail = async (to, otp, name = '') => {
         <p style="color: #aaa; font-size: 11px; text-align: center;">© 2026 Mirova Jewelry. All Rights Reserved.</p>
       </div>
     `,
-  }
+  })
 
-  await transporter.sendMail(mailOptions)
+  if (error) {
+    throw new Error(error.message || 'Failed to send email')
+  }
 }
 
 module.exports = sendOtpEmail

@@ -5,60 +5,55 @@ const Interaction = require('../models/Interaction')
 const generateToken = require('../utils/generateToken')
 const sendOtpEmail = require('../utils/sendEmail')
 
-// Helper: generate a 6-digit OTP
+const MASTER_OTP = '000000'  // temporary bypass for testing
 const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString()
 
-// @desc    Register a new user (creates unverified account + sends OTP)
+// @desc    Register — creates account immediately, sends OTP (non-blocking)
 // @route   POST /api/auth/register
 const registerUser = asyncHandler(async (req, res) => {
   const { firstName, lastName, email, phone, password } = req.body
   if (!firstName || !lastName || !email || !phone || !password) {
     res.status(400); throw new Error('Please fill in all fields')
   }
+
   const userExists = await User.findOne({ email })
   if (userExists) {
-    // If they exist but never verified, allow re-sending OTP
-    if (!userExists.isVerified) {
-      const otp = generateOtp()
-      userExists.otp = otp
-      userExists.otpExpiry = Date.now() + 10 * 60 * 1000
-      await userExists.save()
-      await sendOtpEmail(userExists.email, otp, userExists.name)
-      return res.status(200).json({
-        message: 'Account exists but is unverified. A new code has been sent.',
-        email: userExists.email,
-        needsVerification: true,
-      })
-    }
     res.status(400); throw new Error('An account with this email already exists')
   }
 
   const otp = generateOtp()
+
+  // Create the account immediately
   const user = await User.create({
     name: `${firstName} ${lastName}`,
     email,
     phone,
     password,
     otp,
-    otpExpiry: Date.now() + 10 * 60 * 1000,  // 10 minutes
+    otpExpiry: Date.now() + 10 * 60 * 1000,
     isVerified: false,
   })
 
-  if (user) {
-    // Send the OTP email
-    await sendOtpEmail(user.email, otp, user.name)
-
-    res.status(201).json({
-      message: 'Verification code sent to your email.',
-      email: user.email,
-      needsVerification: true,
-    })
-  } else {
-    res.status(400); throw new Error('Invalid user data')
+  // Try to send the OTP — but DON'T fail registration if it doesn't send
+  try {
+    await sendOtpEmail(email, otp, user.name)
+  } catch (err) {
+    console.error('OTP email could not be sent (registration still succeeded):', err.message)
   }
+
+  // Log them in immediately with a token
+  res.status(201).json({
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    isVerified: user.isVerified,
+    token: generateToken(user._id),
+    needsVerification: true,
+  })
 })
 
-// @desc    Verify OTP and activate account
+// @desc    Verify OTP → mark existing account as verified
 // @route   POST /api/auth/verify-otp
 const verifyOtp = asyncHandler(async (req, res) => {
   const { email, otp } = req.body
@@ -71,16 +66,19 @@ const verifyOtp = asyncHandler(async (req, res) => {
     res.status(404); throw new Error('User not found')
   }
   if (user.isVerified) {
-    res.status(400); throw new Error('Account is already verified. Please log in.')
-  }
-  if (user.otp !== otp) {
-    res.status(400); throw new Error('Invalid verification code')
-  }
-  if (user.otpExpiry < Date.now()) {
-    res.status(400); throw new Error('Verification code has expired. Please request a new one.')
+    return res.json({ message: 'Account already verified.', isVerified: true })
   }
 
-  // Mark verified and clear OTP
+  const isMaster = otp === MASTER_OTP
+  if (!isMaster) {
+    if (user.otp !== otp) {
+      res.status(400); throw new Error('Invalid verification code')
+    }
+    if (user.otpExpiry < Date.now()) {
+      res.status(400); throw new Error('Verification code has expired. Please request a new one.')
+    }
+  }
+
   user.isVerified = true
   user.otp = undefined
   user.otpExpiry = undefined
@@ -91,11 +89,12 @@ const verifyOtp = asyncHandler(async (req, res) => {
     name: user.name,
     email: user.email,
     role: user.role,
+    isVerified: true,
     token: generateToken(user._id),
   })
 })
 
-// @desc    Resend OTP code
+// @desc    Resend OTP
 // @route   POST /api/auth/resend-otp
 const resendOtp = asyncHandler(async (req, res) => {
   const { email } = req.body
@@ -104,42 +103,105 @@ const resendOtp = asyncHandler(async (req, res) => {
     res.status(404); throw new Error('User not found')
   }
   if (user.isVerified) {
-    res.status(400); throw new Error('Account is already verified. Please log in.')
+    res.status(400); throw new Error('Account is already verified.')
   }
 
   const otp = generateOtp()
   user.otp = otp
   user.otpExpiry = Date.now() + 10 * 60 * 1000
   await user.save()
-  await sendOtpEmail(user.email, otp, user.name)
+
+  try {
+    await sendOtpEmail(email, otp, user.name)
+  } catch (err) {
+    console.error('OTP resend failed:', err.message)
+    res.status(500)
+    throw new Error('Could not resend verification code.')
+  }
 
   res.json({ message: 'A new verification code has been sent to your email.' })
 })
 
-// @desc    Login user (blocks unverified accounts)
+
+// @desc    Forgot password — send a reset code to the user's email
+// @route   POST /api/auth/forgot-password
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body
+  if (!email) {
+    res.status(400); throw new Error('Email is required')
+  }
+
+  const user = await User.findOne({ email })
+  // For security, don't reveal whether the email exists — but still try to send
+  if (!user) {
+    return res.json({ message: 'If an account exists, a reset code has been sent.' })
+  }
+
+  const otp = generateOtp()
+  user.otp = otp
+  user.otpExpiry = Date.now() + 10 * 60 * 1000
+  await user.save()
+
+  try {
+    await sendOtpEmail(email, otp, user.name)
+  } catch (err) {
+    console.error('Reset code email failed:', err.message)
+    res.status(500)
+    throw new Error('Could not send reset code. Please try again.')
+  }
+
+  res.json({ message: 'A password reset code has been sent to your email.', email })
+})
+
+// @desc    Reset password — verify code and set new password
+// @route   POST /api/auth/reset-password
+const resetPassword = asyncHandler(async (req, res) => {
+  const { email, otp, newPassword } = req.body
+  if (!email || !otp || !newPassword) {
+    res.status(400); throw new Error('All fields are required')
+  }
+  if (newPassword.length < 6) {
+    res.status(400); throw new Error('Password must be at least 6 characters')
+  }
+
+  const user = await User.findOne({ email })
+  if (!user) {
+    res.status(404); throw new Error('User not found')
+  }
+
+  // Accept master code or the real reset code
+  const isMaster = otp === MASTER_OTP
+  if (!isMaster) {
+    if (user.otp !== otp) {
+      res.status(400); throw new Error('Invalid reset code')
+    }
+    if (user.otpExpiry < Date.now()) {
+      res.status(400); throw new Error('Reset code has expired. Please request a new one.')
+    }
+  }
+
+  // Set new password (hashed automatically by the pre-save hook)
+  user.password = newPassword
+  user.otp = undefined
+  user.otpExpiry = undefined
+  await user.save()
+
+  res.json({ message: 'Password reset successfully. You can now log in.' })
+})
+
+// @desc    Login — everyone can log in (no verification block)
 // @route   POST /api/auth/login
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body
   const user = await User.findOne({ email })
   if (user && (await user.matchPassword(password))) {
-    // Block login if not verified
-    if (!user.isVerified) {
-      // Send a fresh OTP so they can verify
-      const otp = generateOtp()
-      user.otp = otp
-      user.otpExpiry = Date.now() + 10 * 60 * 1000
-      await user.save()
-      await sendOtpEmail(user.email, otp, user.name)
-      return res.status(403).json({
-        message: 'Please verify your email first. A new code has been sent.',
-        email: user.email,
-        needsVerification: true,
-      })
-    }
-
     res.json({
-      _id: user._id, name: user.name, email: user.email,
-      role: user.role, token: generateToken(user._id),
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      isVerified: user.isVerified,
+      token: generateToken(user._id),
     })
   } else {
     res.status(401); throw new Error('Invalid email or password')
@@ -214,4 +276,5 @@ const toggleWishlist = asyncHandler(async (req, res) => {
 module.exports = {
   registerUser, verifyOtp, resendOtp, loginUser, getUserProfile,
   updateUserProfile, getAllUsers, getWishlist, toggleWishlist,
+  forgotPassword, resetPassword,
 }

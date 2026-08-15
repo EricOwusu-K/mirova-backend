@@ -4,12 +4,21 @@ const sendOtpEmail = async (to, otp, name = '') => {
   const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 465,
-    secure: true,               // true for port 465
+    secure: true,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
+    connectionTimeout: 10000,   // 10 seconds
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
+    tls: {
+      rejectUnauthorized: false,
+    },
   })
+
+  // Verify connection before sending (helps surface the real error)
+  await transporter.verify()
 
   const mailOptions = {
     from: `"Mirova Jewellery" <${process.env.EMAIL_USER}>`,
@@ -25,9 +34,7 @@ const sendOtpEmail = async (to, otp, name = '') => {
           <p style="font-size: 36px; letter-spacing: 10px; font-weight: bold; color: #1a1a1a; margin: 24px 0;">${otp}</p>
           <p style="color: #888; font-size: 13px;">This code expires in 10 minutes.</p>
         </div>
-        <p style="color: #aaa; font-size: 11px; text-align: center; margin-top: 24px;">
-          This is an automated message. Please do not reply to this email.
-        </p>
+        <p style="color: #aaa; font-size: 11px; text-align: center; margin-top: 24px;">This is an automated message. Please do not reply to this email.</p>
         <p style="color: #aaa; font-size: 11px; text-align: center;">© 2026 Mirova Jewelry. All Rights Reserved.</p>
       </div>
     `,

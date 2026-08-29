@@ -10,6 +10,7 @@ const {
   deleteProduct,
   logInteraction,
   getRecommendations,
+  prepareTryOn,
 } = require('../controllers/productController')
 const { protect, adminOnly } = require('../middleware/authMiddleware')
 
@@ -22,5 +23,6 @@ router.post('/', protect, adminOnly, createProduct)
 router.put('/:id', protect, adminOnly, updateProduct)
 router.delete('/:id', protect, adminOnly, deleteProduct)
 router.post('/:id/interact', protect, logInteraction)
+router.post('/:id/prepare-tryon', protect, prepareTryOn)
 
 module.exports = router

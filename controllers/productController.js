@@ -1,6 +1,9 @@
 const asyncHandler = require('express-async-handler')
 const Product = require('../models/Product')
 const Interaction = require('../models/Interaction')
+const fetch = require('node-fetch')
+const FormData = require('form-data')
+const { cloudinary } = require('../config/cloudinary')
 
 // @desc    Get personalised recommendations for logged in user
 // @route   GET /api/products/recommended
@@ -242,6 +245,71 @@ const logInteraction = asyncHandler(async (req, res) => {
   res.status(201).json(interaction)
 })
 
+// @desc    Prepare a transparent try-on image for a product (cached after first run)
+// @route   POST /api/products/:id/prepare-tryon
+const prepareTryOn = asyncHandler(async (req, res) => {
+  const product = await Product.findById(req.params.id)
+  if (!product) {
+    res.status(404)
+    throw new Error('Product not found')
+  }
+
+  // Already prepared → return cached transparent image (no remove.bg call)
+  if (product.tryOnImage) {
+    return res.json({ tryOnImage: product.tryOnImage, cached: true })
+  }
+
+  // No source image to process
+  if (!product.images || product.images.length === 0) {
+    res.status(400)
+    throw new Error('Product has no image to process')
+  }
+
+  try {
+    // 1. Download the product image (with background) from Cloudinary
+    const imgRes = await fetch(product.images[0])
+    const imgBuffer = await imgRes.buffer()
+
+    // 2. Send to remove.bg
+    const formData = new FormData()
+    formData.append('image_file', imgBuffer, { filename: 'product.png' })
+    formData.append('size', 'auto')
+
+    const removeBgResponse = await fetch('https://api.remove.bg/v1.0/removebg', {
+      method: 'POST',
+      headers: {
+        'X-Api-Key': process.env.REMOVEBG_API_KEY,
+        ...formData.getHeaders(),
+      },
+      body: formData,
+    })
+
+    if (!removeBgResponse.ok) {
+      throw new Error('Background removal failed')
+    }
+
+    // 3. Upload the transparent PNG to Cloudinary
+    const bgRemovedBuffer = await removeBgResponse.buffer()
+    const result = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        { folder: 'mirova-tryon', format: 'png' },
+        (error, result) => (error ? reject(error) : resolve(result))
+      )
+      uploadStream.end(bgRemovedBuffer)
+    })
+
+    // 4. Cache it on the product so we never process it again
+    product.tryOnImage = result.secure_url
+    await product.save()
+
+    res.json({ tryOnImage: product.tryOnImage, cached: false })
+  } catch (error) {
+    console.error('prepareTryOn failed:', error.message)
+    // Fallback: use the original image so try-on still works (just not transparent)
+    res.json({ tryOnImage: product.images[0], cached: false, fallback: true })
+  }
+})
+
 module.exports = {
   getProducts,
   getProductById,
@@ -252,4 +320,5 @@ module.exports = {
   deleteProduct,
   logInteraction,
   getRecommendations,
+  prepareTryOn,
 }

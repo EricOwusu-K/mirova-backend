@@ -204,6 +204,13 @@ const updateProduct = asyncHandler(async (req, res) => {
     throw new Error('Product not found')
   }
 
+  // If the product image changed, clear the cached try-on image
+  // so it gets regenerated from the new image on next try-on
+  const newImages = req.body.images
+  if (newImages && JSON.stringify(newImages) !== JSON.stringify(product.images)) {
+    req.body.tryOnImage = ''
+  }
+
   const updatedProduct = await Product.findByIdAndUpdate(
     req.params.id,
     req.body,
